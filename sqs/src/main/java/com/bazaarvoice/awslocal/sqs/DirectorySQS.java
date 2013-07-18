@@ -50,14 +50,14 @@ public class DirectorySQS implements AmazonSQS {
     }
 
     private void startWatcher() throws IOException {
-        new Thread() {
+        final Thread thread = new Thread() {
             @Override
             public void run() {
                 while (true) {
                     try {
                         final WatchKey key = _queuesWatcher.take();
                         for (WatchEvent<?> event : key.pollEvents()) {
-                            handleWatcherEvent(event, (Path)key.watchable());
+                            handleWatcherEvent(event, (Path) key.watchable());
                         }
                         key.reset();
                     } catch (IOException e) {
@@ -68,7 +68,10 @@ public class DirectorySQS implements AmazonSQS {
                     }
                 }
             }
-        }.start();
+        };
+        thread.setName("DirectorySQS-Watcher-Thread");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private void handleWatcherEvent(WatchEvent<?> event, Path parent) throws IOException {
@@ -308,7 +311,6 @@ public class DirectorySQS implements AmazonSQS {
         throw new UnsupportedOperationException("not implemented");
     }
 
-    //no
     public void shutdown() {
         try {
             _queuesWatcher.close();
