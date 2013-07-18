@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -26,6 +27,14 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * This class manages a single queue that is persisted in a particular directory.
+ *
+ * It tracks the state of the directory in-memory, which may get stale if other instances are
+ *  operating on the same directory.  To deal with this, it always validates its "known" messages,
+ *  and claims them with atomic file system operations.  Finally, it relies on a process external
+ *  to this class to watch the directory and inform it of new messages that may be available.
+ */
 public class DirectorySQSQueue {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DirectorySQSQueue.class);
@@ -42,14 +51,10 @@ public class DirectorySQSQueue {
         if (!Files.isDirectory(path)) {
             throw new FileNotFoundException("Invalid path: " + path);
         }
-        for (Path file : Files.newDirectoryStream(_path)) {
-            if (!Files.isRegularFile(file) || !file.getFileName().toString().endsWith(SUFFIX)) {
-                continue;
-            }
-            try {
-                _messageQueue.offer(toMessageAccessor(file));
-            } catch (Exception e) {
-                LOGGER.warn("Error parsing filename: " + file, e);
+
+        try (final DirectoryStream<Path> stream = Files.newDirectoryStream(_path)) {
+            for (Path file : stream) {
+                addFile(file);
             }
         }
     }
@@ -58,7 +63,7 @@ public class DirectorySQSQueue {
         return _path;
     }
 
-    public void informCreated(Path messageFile) {
+    public void addFile(Path messageFile) {
         if (!Files.isRegularFile(messageFile) || !messageFile.getFileName().toString().endsWith(SUFFIX)) {
             return;
         }

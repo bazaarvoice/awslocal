@@ -216,9 +216,9 @@ public class TestSQSClient {
         return RandomStringUtils.random(1024);
     }
 
-    private FileSQSClient createSQSClient()
+    private DirectorySQS createSQSClient()
             throws IOException {
-        return new FileSQSClient(createTempDirectory());
+        return new DirectorySQS(createTempDirectory());
     }
 
     public static File createTempDirectory() {

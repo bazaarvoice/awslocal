@@ -21,9 +21,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class FileSQSClient implements AmazonSQS {
+/**
+ * This class is a basic implementation of AmazonSQS, intended as a substitute for local development/testing.
+ */
+public class DirectorySQS implements AmazonSQS {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(FileSQSClient.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(DirectorySQS.class);
 
     private static final int AMAZON_DEFAULT_VISIBILITY = 30; // seconds
 
@@ -33,12 +36,12 @@ public class FileSQSClient implements AmazonSQS {
     private final Map<String, DirectorySQSQueue> _queuesByUrl = Maps.newHashMap();
     private final WatchService _queuesWatcher;
 
-    public FileSQSClient(File rootDirectory)
+    public DirectorySQS(File rootDirectory)
             throws IOException {
         this(rootDirectory, AMAZON_DEFAULT_VISIBILITY);
     }
 
-    public FileSQSClient(File rootDirectory, int defaultVisibilitySeconds) throws IOException {
+    public DirectorySQS(File rootDirectory, int defaultVisibilitySeconds) throws IOException {
         checkAccess(rootDirectory);
         _rootDirectory = rootDirectory;
         _defaultVisibilitySeconds = defaultVisibilitySeconds;
@@ -50,7 +53,6 @@ public class FileSQSClient implements AmazonSQS {
         new Thread() {
             @Override
             public void run() {
-                //noinspection InfiniteLoopStatement
                 while (true) {
                     try {
                         final WatchKey key = _queuesWatcher.take();
@@ -58,10 +60,11 @@ public class FileSQSClient implements AmazonSQS {
                             handleWatcherEvent(event, (Path)key.watchable());
                         }
                         key.reset();
-                    }  catch (IOException e ) {
-                        //log an error, recover somehow...
-                    } catch (InterruptedException e) {
-                        // exit
+                    } catch (IOException e) {
+                        LOGGER.warn("Error watching: " + _rootDirectory, e);
+                    } catch (ClosedWatchServiceException | InterruptedException e) {
+                        LOGGER.debug("Watcher thread exiting: " + _rootDirectory);
+                        break;
                     }
                 }
             }
@@ -75,7 +78,7 @@ public class FileSQSClient implements AmazonSQS {
             return; //some file was created somewhere but we don't know about the queue it's in
         }
         if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
-            queueOfEvent.informCreated(parent.resolve(newPath));
+            queueOfEvent.addFile(parent.resolve(newPath));
         }
     }
 
@@ -307,7 +310,11 @@ public class FileSQSClient implements AmazonSQS {
 
     //no
     public void shutdown() {
-        throw new UnsupportedOperationException("not implemented");
+        try {
+            _queuesWatcher.close();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     //no

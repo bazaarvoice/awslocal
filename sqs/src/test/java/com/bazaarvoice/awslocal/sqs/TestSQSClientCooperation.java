@@ -33,8 +33,8 @@ public class TestSQSClientCooperation {
     {
         try {
             _commonDirectory = TestSQSClient.createTempDirectory();
-            _sqs1 = new FileSQSClient(_commonDirectory);
-            _sqs2 = new FileSQSClient(_commonDirectory);
+            _sqs1 = new DirectorySQS(_commonDirectory);
+            _sqs2 = new DirectorySQS(_commonDirectory);
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
