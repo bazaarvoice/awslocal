@@ -263,8 +263,8 @@ public class DirectorySQS implements AmazonSQS {
 
     public ListQueuesResult listQueues(ListQueuesRequest listQueuesRequest) throws AmazonServiceException, AmazonClientException {
         List<String> queueUrls = Lists.newArrayListWithCapacity(_queuesByUrl.size());
-        try {
-            for (Path queuePath : Files.newDirectoryStream(_rootDirectory.toPath())) {
+        try (DirectoryStream<Path> queuePaths = Files.newDirectoryStream(_rootDirectory.toPath())) {
+            for (Path queuePath : queuePaths) {
                 if (listQueuesRequest.getQueueNamePrefix() == null || queuePath.getFileName().toString().startsWith(listQueuesRequest.getQueueNamePrefix())) {
                     queueUrls.add(queuePath.toUri().toString());
                 }

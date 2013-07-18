@@ -22,6 +22,6 @@
         <module>parent</module>
         <module>sqs</module>
         <module>sns</module>
+        <module>config</module>
     </modules>
-
 </project>
