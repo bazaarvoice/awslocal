@@ -41,14 +41,6 @@ public class TestSNSClient {
         }
     }
 
-    private String makeTopicArn(String name) {
-        return "arn:aws:sns:local:user:" + name;
-    }
-
-    private String makeSomeSubArn(String topicName) {
-        return makeTopicArn(topicName) + ":" + RandomStringUtils.randomNumeric(7);
-    }
-
     public void publishAndReceive() {
         final String queueName = someQueueName();
         final String queueUrl = someNewQueue(queueName);
@@ -60,7 +52,7 @@ public class TestSNSClient {
                         withTopicArn(makeTopicArn(topicName)).
                         withProtocol("sqs").
                         withSubscriptionArn(makeSomeSubArn(topicName)).
-                        withEndpoint(queueName));
+                        withEndpoint(makeTopicArn(queueName)));
 
         Assert.assertEquals(amazonSNS.listTopics().getTopics().size(), 1);
         Assert.assertEquals(amazonSNS.listSubscriptions().getSubscriptions().size(), 1);
@@ -88,7 +80,7 @@ public class TestSNSClient {
                         withTopicArn(makeTopicArn(topicName)).
                         withProtocol("sqs").
                         withSubscriptionArn(makeSomeSubArn(topicName)).
-                        withEndpoint(queueName));
+                        withEndpoint(makeTopicArn(queueName)));
 
         amazonSNS.publish(new PublishRequest(makeTopicArn(topicName), message));
 
@@ -110,14 +102,14 @@ public class TestSNSClient {
         Assert.assertEquals(amazonSNS.listTopics().getTopics().size(), 1);
         Assert.assertEquals(amazonSNS.listTopics().getTopics().get(0).getTopicArn(), makeTopicArn(topicName));
 
-        //make sure create is monotonic
+        //make sure create is idempotent
         amazonSNS.createTopic(new CreateTopicRequest(topicName));
         Assert.assertEquals(amazonSNS.listTopics().getTopics().size(), 1, "existing topic duplicated?");
         Assert.assertEquals(amazonSNS.listTopics().getTopics().get(0).getTopicArn(), makeTopicArn(topicName));
 
         //subscribe.
         amazonSNS.subscribe(new SubscribeRequest().
-                withEndpoint(queueName).
+                withEndpoint(makeQueueArn(queueName)).
                 withProtocol("sqs").
                 withTopicArn(makeTopicArn(topicName)));
 
@@ -137,6 +129,18 @@ public class TestSNSClient {
 
 
 
+    }
+
+    private String makeQueueArn(String queueName) {
+        return "arn:aws:sqs:local:user:" + queueName;
+    }
+
+    private String makeTopicArn(String name) {
+        return "arn:aws:sns:local:user:" + name;
+    }
+
+    private String makeSomeSubArn(String topicName) {
+        return makeTopicArn(topicName) + ":" + RandomStringUtils.randomNumeric(7);
     }
 
     private String someNewQueue(String queueName) {

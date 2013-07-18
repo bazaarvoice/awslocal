@@ -43,7 +43,6 @@ import com.google.common.base.Objects;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +50,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class InMemorySNS implements AmazonSNS {
     private static final Logger LOGGER = LoggerFactory.getLogger(InMemorySNS.class);
@@ -61,41 +59,41 @@ public class InMemorySNS implements AmazonSNS {
             return new Topic().withTopicArn(s);
         }
     };
+    private static final String BASE_ARN = "arn:aws:sns:local:user:";
 
-    private Set<String> _topics;
-    private Map<String, List<String>> _topicSubscriptions;
-    private Map<String, Subscription> _subscriptions;
+    private Map<String, List<String>> _subscriptionsForTopic = Maps.newHashMap();
+    private Map<String, Subscription> _subscriptionsByArn = Maps.newHashMap();
 
     private AmazonSQS _sqsClient;
 
 
     public InMemorySNS(AmazonSQS sqsClient, Subscription... subscriptions) {
         _sqsClient = sqsClient;
-        _topics = Sets.newHashSet();
-        _topicSubscriptions = Maps.newHashMap();
-        _subscriptions = Maps.newHashMap();
         for (Subscription subscription : subscriptions) {
-            _topics.add(subscription.getTopicArn());
-            _subscriptions.put(subscription.getSubscriptionArn(), subscription);
-            if (!_topicSubscriptions.containsKey(subscription.getTopicArn())) {
-                _topicSubscriptions.put(subscription.getTopicArn(), new ArrayList<String>());
+            _subscriptionsByArn.put(subscription.getSubscriptionArn(), subscription);
+            if (!_subscriptionsForTopic.containsKey(subscription.getTopicArn())) {
+                _subscriptionsForTopic.put(subscription.getTopicArn(), new ArrayList<String>());
             }
-            _topicSubscriptions.get(subscription.getTopicArn()).add(subscription.getSubscriptionArn());
+            _subscriptionsForTopic.get(subscription.getTopicArn()).add(subscription.getSubscriptionArn());
         }
+    }
+    public static <T> T getLast(T[] array) {
+        return array.length > 0 ? array[array.length - 1] : null;
     }
 
     public PublishResult publish(PublishRequest publishRequest) throws AmazonServiceException, AmazonClientException {
         String topicArn = publishRequest.getTopicArn();
-        if (!_topics.contains(topicArn)) {
+        if (!_subscriptionsForTopic.containsKey(topicArn)) {
             throw new NotFoundException("no such topic " + topicArn);
         }
         List<Subscription> topicSubscriptions = FluentIterable.
-                from(_topicSubscriptions.get(topicArn)).
-                transform(Functions.forMap(_subscriptions)).
+                from(_subscriptionsForTopic.get(topicArn)).
+                transform(Functions.forMap(_subscriptionsByArn)).
                 toList();
         for (Subscription subscription : topicSubscriptions) {
-            String queueUrl = _sqsClient.getQueueUrl(new GetQueueUrlRequest().
-                    withQueueName(subscription.getEndpoint())).
+            String queueName = getLast(subscription.getEndpoint().split(":"));
+            String queueUrl = _sqsClient.
+                    getQueueUrl(new GetQueueUrlRequest().withQueueName(queueName)).
                     getQueueUrl();
             _sqsClient.sendMessage(new SendMessageRequest().
                     withQueueUrl(queueUrl).
@@ -110,60 +108,58 @@ public class InMemorySNS implements AmazonSNS {
             throw new InvalidParameterException("endpoint protocol " + protocol + " not supported");
         }
         final String topicArn = subscribeRequest.getTopicArn();
-        if (!_topics.contains(topicArn)) {
+        if (!_subscriptionsForTopic.containsKey(topicArn)) {
             throw new InvalidParameterException("no such topic " + topicArn);
         }
         String subscriptionArn = topicArn + ":" + RandomStringUtils.randomNumeric(7);
-        if (!_subscriptions.containsKey(subscriptionArn)) {
-            _subscriptions.put(subscriptionArn, new Subscription().
+        if (!_subscriptionsByArn.containsKey(subscriptionArn)) {
+            _subscriptionsByArn.put(subscriptionArn, new Subscription().
                     withTopicArn(topicArn).
                     withProtocol(protocol).
                     withSubscriptionArn(subscriptionArn).
                     withEndpoint(subscribeRequest.getEndpoint()));
-            _topicSubscriptions.get(topicArn).add(subscriptionArn);
+            _subscriptionsForTopic.get(topicArn).add(subscriptionArn);
         }
 
         return new SubscribeResult().withSubscriptionArn(subscriptionArn);
     }
 
     public void deleteTopic(DeleteTopicRequest deleteTopicRequest) throws AmazonServiceException, AmazonClientException {
-        _topics.remove(deleteTopicRequest.getTopicArn());
         List<String> subscriptions = Objects.firstNonNull(
-                _topicSubscriptions.remove(deleteTopicRequest.getTopicArn()),
+                _subscriptionsForTopic.remove(deleteTopicRequest.getTopicArn()),
                 new ArrayList<String>());
         for (String subscription : subscriptions) {
-            _subscriptions.remove(subscription);
+            _subscriptionsByArn.remove(subscription);
         }
     }
 
     public CreateTopicResult createTopic(CreateTopicRequest createTopicRequest) throws AmazonServiceException, AmazonClientException {
-        String topicArn = "arn:aws:sns:local:user:" + createTopicRequest.getName();
+        String topicArn = BASE_ARN + createTopicRequest.getName();
         CreateTopicResult result = new CreateTopicResult().withTopicArn(topicArn);
-        if (!_topics.contains(topicArn)) {
-            _topics.add(topicArn);
-            _topicSubscriptions.put(topicArn, new ArrayList<String>());
+        if (!_subscriptionsForTopic.containsKey(topicArn)) {
+            _subscriptionsForTopic.put(topicArn, new ArrayList<String>());
         }
         return result;
     }
 
     public void unsubscribe(UnsubscribeRequest unsubscribeRequest) throws AmazonServiceException, AmazonClientException {
-        if (!_subscriptions.containsKey(unsubscribeRequest.getSubscriptionArn()))
+        if (!_subscriptionsByArn.containsKey(unsubscribeRequest.getSubscriptionArn()))
             throw new NotFoundException("no such subscription");
-        Subscription removed = _subscriptions.remove(unsubscribeRequest.getSubscriptionArn());
-        _topicSubscriptions.get(removed.getSubscriptionArn()).remove(removed.getSubscriptionArn());
+        Subscription removed = _subscriptionsByArn.remove(unsubscribeRequest.getSubscriptionArn());
+        _subscriptionsForTopic.get(removed.getSubscriptionArn()).remove(removed.getSubscriptionArn());
     }
 
     public ListSubscriptionsByTopicResult listSubscriptionsByTopic(ListSubscriptionsByTopicRequest listSubscriptionsByTopicRequest) throws AmazonServiceException, AmazonClientException {
         return new ListSubscriptionsByTopicResult().
                 withSubscriptions(FluentIterable.
-                        from(_topicSubscriptions.get(listSubscriptionsByTopicRequest.getTopicArn())).
-                        filter(Predicates.in(_subscriptions.keySet())).
-                        transform(Functions.forMap(_subscriptions)).
+                        from(_subscriptionsForTopic.get(listSubscriptionsByTopicRequest.getTopicArn())).
+                        filter(Predicates.in(_subscriptionsByArn.keySet())).
+                        transform(Functions.forMap(_subscriptionsByArn)).
                         toList());
     }
 
     public ListSubscriptionsResult listSubscriptions() throws AmazonServiceException, AmazonClientException {
-        return new ListSubscriptionsResult().withSubscriptions(_subscriptions.values());
+        return new ListSubscriptionsResult().withSubscriptions(_subscriptionsByArn.values());
     }
 
     public ListSubscriptionsResult listSubscriptions(ListSubscriptionsRequest listSubscriptionsRequest) throws AmazonServiceException, AmazonClientException {
@@ -173,7 +169,7 @@ public class InMemorySNS implements AmazonSNS {
     public ListTopicsResult listTopics() throws AmazonServiceException, AmazonClientException {
         return new ListTopicsResult().
                 withTopics(FluentIterable.
-                        from(_topics).
+                        from(_subscriptionsForTopic.keySet()).
                         transform(NEW_TOPIC).
                         toList());
     }
