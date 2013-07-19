@@ -117,4 +117,11 @@
         </pluginManagement>
     </build>
 
+    <distributionManagement>
+         <repository>
+             <id>bazaarvoice-deploy</id>
+             <url>https://repo.bazaarvoice.com/nexus/content/repositories/releases/</url>
+         </repository>
+     </distributionManagement>
+
 </project>
