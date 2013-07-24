@@ -44,7 +44,7 @@ public class TestSQSClientCooperation {
         final String queueUrl = someNewQueue();
         final SendMessageResult sendMessageResult = _sqs1.sendMessage(new SendMessageRequest(queueUrl, someMessageBody()));
 
-        final ReceiveMessageResult receiveMessageResult = _sqs2.receiveMessage(new ReceiveMessageRequest(queueUrl).withWaitTimeSeconds(60));
+        final ReceiveMessageResult receiveMessageResult = _sqs2.receiveMessage(new ReceiveMessageRequest(queueUrl).withWaitTimeSeconds(20));
         Assert.assertEquals(receiveMessageResult.getMessages().size(), 1, "Expected one message");
 
         final Message message = receiveMessageResult.getMessages().get(0);
@@ -56,7 +56,7 @@ public class TestSQSClientCooperation {
         final String queueUrl = someNewQueue();
         final SendMessageResult sendMessageResult = _sqs1.sendMessage(new SendMessageRequest(queueUrl, someMessageBody()));
 
-        final ReceiveMessageResult receiveMessageResult = _sqs2.receiveMessage(new ReceiveMessageRequest(queueUrl).withWaitTimeSeconds(60));
+        final ReceiveMessageResult receiveMessageResult = _sqs2.receiveMessage(new ReceiveMessageRequest(queueUrl).withWaitTimeSeconds(20));
         Assert.assertEquals(receiveMessageResult.getMessages().size(), 1, "Expected one message");
 
         final Message message = receiveMessageResult.getMessages().get(0);
@@ -82,12 +82,12 @@ public class TestSQSClientCooperation {
         final SendMessageResult sendResult1 = _sqs1.sendMessage(new SendMessageRequest(queueUrl, someMessageBody()));
         final ReceiveMessageResult result1 = _sqs2.receiveMessage(new ReceiveMessageRequest(queueUrl).
                 withWaitTimeSeconds(10).
-                withVisibilityTimeout(60).
+                withVisibilityTimeout(30).
                 withMaxNumberOfMessages(1));
         Assert.assertEquals(result1.getMessages().size(), 1, "first receive failed");
 
         final SendMessageResult sendResult2 = _sqs1.sendMessage(new SendMessageRequest(queueUrl, someMessageBody()));
-        final ReceiveMessageResult result2 = _sqs2.receiveMessage(new ReceiveMessageRequest(queueUrl).withWaitTimeSeconds(30).withMaxNumberOfMessages(1));
+        final ReceiveMessageResult result2 = _sqs2.receiveMessage(new ReceiveMessageRequest(queueUrl).withWaitTimeSeconds(20).withMaxNumberOfMessages(1));
         Assert.assertEquals(result2.getMessages().size(), 1, "second receive failed");
     }
 
@@ -105,7 +105,7 @@ public class TestSQSClientCooperation {
 
         final SendMessageResult sendResult2 = _sqs1.sendMessage(new SendMessageRequest(queueUrl, someMessageBody()));
         final ReceiveMessageResult result3 = _sqs2.receiveMessage(new ReceiveMessageRequest(queueUrl).
-                withWaitTimeSeconds(30).
+                withWaitTimeSeconds(20).
                 withMaxNumberOfMessages(1));
         Assert.assertEquals(result3.getMessages().size(), 1, "second receive failed");
     }
@@ -127,13 +127,13 @@ public class TestSQSClientCooperation {
             sentBodiesMD5.add(sendMessageResult.getMD5OfMessageBody());
         }
         final ReceiveMessageResult receiveMessageResult1 = _sqs2.receiveMessage(new ReceiveMessageRequest(queueUrl)
-                .withWaitTimeSeconds(60)
+                .withWaitTimeSeconds(20)
                 .withMaxNumberOfMessages(5));
 
         Assert.assertEquals(receiveMessageResult1.getMessages().size(), 5, "c1 did not get 5 messages");
 
         final ReceiveMessageResult receiveMessageResult2 = _sqs2.receiveMessage(new ReceiveMessageRequest(queueUrl).
-                withWaitTimeSeconds(60).
+                withWaitTimeSeconds(20).
                 withMaxNumberOfMessages(5));
 
         Assert.assertEquals(receiveMessageResult2.getMessages().size(), 5, "c2 did not get 5 messages");
@@ -151,7 +151,7 @@ public class TestSQSClientCooperation {
 
         final ReceiveMessageResult receiveMessageResult1 = _sqs1.receiveMessage(new ReceiveMessageRequest(queueUrl).
                 withMaxNumberOfMessages(1).
-                withWaitTimeSeconds(30));
+                withWaitTimeSeconds(20));
 
         Assert.assertEquals(receiveMessageResult1.getMessages().size(), 1);
 

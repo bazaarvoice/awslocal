@@ -180,6 +180,9 @@ public class DirectorySQS implements AmazonSQS {
         int visibilityTimeout = Objects.firstNonNull(receiveMessageRequest.getVisibilityTimeout(), _defaultVisibilitySeconds);
         //also a wait time
         int waitTime = Objects.firstNonNull(receiveMessageRequest.getWaitTimeSeconds(), 0);
+        if (waitTime < 0 || waitTime > 20) {
+            throw new AmazonServiceException("wait time of " + waitTime + " is not between 0 and 20");
+        }
         try {
             List<Message> messageList = queue.receive(maxNumberOfMessages, visibilityTimeout, waitTime);
             return new ReceiveMessageResult().withMessages(messageList);

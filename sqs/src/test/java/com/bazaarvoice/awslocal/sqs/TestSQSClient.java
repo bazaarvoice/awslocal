@@ -116,6 +116,24 @@ public class TestSQSClient {
         Assert.assertEquals(message.getMD5OfBody(), sendResult.getMD5OfMessageBody());
     }
 
+    public void waitTimeRequirement() {
+        final String queueUrl = someNewQueue();
+        int count = 0;
+        try {
+            final ReceiveMessageResult receiveResult = _amazonSQS.receiveMessage(new ReceiveMessageRequest(queueUrl).withWaitTimeSeconds(21));
+        } catch (AmazonServiceException e) {
+            Assert.assertTrue(e.getMessage().contains("21"));
+            count++;
+        }
+        try {
+            final ReceiveMessageResult receiveResult = _amazonSQS.receiveMessage(new ReceiveMessageRequest(queueUrl).withWaitTimeSeconds(-1));
+        } catch (AmazonServiceException e) {
+            Assert.assertTrue(e.getMessage().contains("-1"));
+            count++;
+        }
+        Assert.assertEquals(count, 2);
+    }
+
     public void willSendAndReceiveMultipleMessages() {
         final String queueUrl = someNewQueue();
 
