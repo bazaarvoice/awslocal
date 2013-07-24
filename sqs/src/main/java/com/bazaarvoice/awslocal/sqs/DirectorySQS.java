@@ -286,7 +286,8 @@ public class DirectorySQS implements AmazonSQS {
         //attempt to change the visibility on each
         for (SendMessageBatchRequestEntry batchRequestEntry : sendMessageBatchRequest.getEntries()) {
             try {
-                Message sentMessage = queue.send(batchRequestEntry.getMessageBody(), batchRequestEntry.getDelaySeconds());
+                final int invisibilityDelay = Objects.firstNonNull(batchRequestEntry.getDelaySeconds(), 0);//0 is amazon spec default
+                Message sentMessage = queue.send(batchRequestEntry.getMessageBody(), invisibilityDelay);
                 batchResultEntries.add(new SendMessageBatchResultEntry().
                         withId(batchRequestEntry.getId()).
                         withMessageId(sentMessage.getMessageId()).
