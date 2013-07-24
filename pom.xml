@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.bazaarvoice.awslocal</groupId>
         <artifactId>parent</artifactId>
-        <version>1.0.2-SNAPSHOT</version>
+        <version>1.0.2</version>
         <relativePath>parent/pom.xml</relativePath>
     </parent>
 
@@ -14,7 +14,7 @@
 
     <scm>
         <connection>scm:git:git@github.com:bazaarvoice/awslocal.git</connection>
-      <tag>HEAD</tag>
+      <tag>awslocal-1.0.2</tag>
   </scm>
 
     <modules>
