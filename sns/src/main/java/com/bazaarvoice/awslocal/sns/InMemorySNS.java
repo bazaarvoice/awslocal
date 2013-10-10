@@ -66,7 +66,6 @@ public class InMemorySNS implements AmazonSNS {
 
     private AmazonSQS _sqsClient;
 
-
     public InMemorySNS(AmazonSQS sqsClient, Subscription... subscriptions) {
         _sqsClient = sqsClient;
         for (Subscription subscription : subscriptions) {
@@ -76,9 +75,6 @@ public class InMemorySNS implements AmazonSNS {
             }
             _subscriptionsForTopic.get(subscription.getTopicArn()).add(subscription.getSubscriptionArn());
         }
-    }
-    public static <T> T getLast(T[] array) {
-        return array.length > 0 ? array[array.length - 1] : null;
     }
 
     public PublishResult publish(PublishRequest publishRequest) throws AmazonServiceException, AmazonClientException {
@@ -221,4 +217,10 @@ public class InMemorySNS implements AmazonSNS {
     public GetSubscriptionAttributesResult getSubscriptionAttributes(GetSubscriptionAttributesRequest getSubscriptionAttributesRequest) throws AmazonServiceException, AmazonClientException {
         throw new UnsupportedOperationException("not implemented");
     }
+
+    private static <T> T getLast(T[] array) {
+        return array.length > 0 ? array[array.length - 1] : null;
+    }
+
 }
+

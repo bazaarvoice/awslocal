@@ -5,7 +5,6 @@
     <groupId>com.bazaarvoice.awslocal</groupId>
     <artifactId>parent</artifactId>
     <version>1.0.4-SNAPSHOT</version>
-
     <packaging>pom</packaging>
 
     <dependencyManagement>
@@ -23,7 +22,7 @@
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>14.0.1</version>
+                <version>15.0</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
@@ -45,16 +44,6 @@
                 <groupId>javax.validation</groupId>
                 <artifactId>validation-api</artifactId>
                 <version>1.0.0.GA</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-annotations</artifactId>
-                <version>2.1.4</version>
-            </dependency>
-            <dependency>
-                <groupId>org.hibernate</groupId>
-                <artifactId>hibernate-validator</artifactId>
-                <version>4.3.1.Final</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -116,10 +105,10 @@
     </build>
 
     <distributionManagement>
-         <repository>
-             <id>bazaarvoice-deploy</id>
-             <url>https://repo.bazaarvoice.com/nexus/content/repositories/releases/</url>
-         </repository>
-     </distributionManagement>
-
+        <repository>
+            <id>bazaarvoice-deploy</id>
+            <url>https://repo.bazaarvoice.com/nexus/content/repositories/releases/</url>
+        </repository>
+    </distributionManagement>
 </project>
+
