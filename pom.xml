@@ -13,9 +13,10 @@
     <packaging>pom</packaging>
 
     <scm>
+        <url>https://github.com/bazaarvoice/awslocal</url>
         <connection>scm:git:git@github.com:bazaarvoice/awslocal.git</connection>
-      <tag>HEAD</tag>
-  </scm>
+        <developerConnection>scm:git:git@github.com:bazaarvoice/awslocal.git</developerConnection>
+    </scm>
 
     <modules>
         <module>parent</module>

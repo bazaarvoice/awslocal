@@ -32,7 +32,7 @@ public class TestSQSClientCooperation {
     public void prepareClients()
     {
         try {
-            _commonDirectory = TestSQSClient.createTempDirectory();
+            _commonDirectory = TestUtils.createTempDirectory();
             _sqs1 = new DirectorySQS(_commonDirectory);
             _sqs2 = new DirectorySQS(_commonDirectory);
         } catch (IOException e) {
@@ -174,15 +174,5 @@ public class TestSQSClientCooperation {
     private String someMessageBody() {
         return RandomStringUtils.random(1024);
     }
-
-    public static File createTempDirectory() {
-        try {
-            final File directory = Files.createTempDirectory("sqs").toFile();
-            directory.deleteOnExit(); // not sure if this works
-            return directory;
-        } catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
-    }
-
 }
+

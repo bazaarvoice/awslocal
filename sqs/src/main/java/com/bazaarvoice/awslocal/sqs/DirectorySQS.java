@@ -91,7 +91,7 @@ public class DirectorySQS implements AmazonSQS {
             directory.mkdirs();
         }
         if (!directory.exists() || !directory.isDirectory() || !directory.canRead() || !directory.canWrite()) {
-            throw new IllegalArgumentException("Unable to access directory: "+ directory);
+            throw new IllegalArgumentException("Unable to access directory: " + directory);
         }
     }
 
@@ -349,3 +349,4 @@ public class DirectorySQS implements AmazonSQS {
         throw new UnsupportedOperationException("not implemented");
     }
 }
+

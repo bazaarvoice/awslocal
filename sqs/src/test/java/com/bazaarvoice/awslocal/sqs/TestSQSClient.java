@@ -17,7 +17,6 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
-import com.google.common.base.Throwables;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -25,7 +24,6 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.Collections;
 
 @Test
@@ -72,7 +70,7 @@ public class TestSQSClient {
     @Test(expectedExceptions = QueueDoesNotExistException.class)
     public void cannotDeleteNonExistentQueue()
             throws IOException {
-        _amazonSQS.deleteQueue(new DeleteQueueRequest(new File(createTempDirectory(), someQueueName()).toURI().toString()));
+        _amazonSQS.deleteQueue(new DeleteQueueRequest(new File(TestUtils.createTempDirectory(), someQueueName()).toURI().toString()));
     }
 
     @Test(expectedExceptions = AmazonServiceException.class)
@@ -236,17 +234,7 @@ public class TestSQSClient {
 
     private DirectorySQS createSQSClient()
             throws IOException {
-        return new DirectorySQS(createTempDirectory());
+        return new DirectorySQS(TestUtils.createTempDirectory());
     }
-
-    public static File createTempDirectory() {
-        try {
-            final File directory = Files.createTempDirectory("sqs").toFile();
-            directory.deleteOnExit(); // not sure if this works
-            return directory;
-        } catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
-    }
-
 }
+
