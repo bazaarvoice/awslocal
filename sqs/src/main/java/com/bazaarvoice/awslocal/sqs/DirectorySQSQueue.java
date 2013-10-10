@@ -4,6 +4,7 @@ import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiptHandleIsInvalidException;
 import com.amazonaws.util.BinaryUtils;
 import com.amazonaws.util.Md5Utils;
+import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -224,14 +225,10 @@ public class DirectorySQSQueue {
 
         @Override
         public int compareTo(MessageAccessor that) {
-            int z = Ints.saturatedCast(this._visibilityTimeMillis - that._visibilityTimeMillis);
-            if (z == 0) {
-                z = this._number - that._number;
-            }
-            if (z == 0) {
-                z = this._messageId.compareTo(that._messageId);
-            }
-            return z;
+            return ComparisonChain.start()
+                    .compare(this._visibilityTimeMillis, that._visibilityTimeMillis)
+                    .compare(this._messageId, that._messageId)
+                    .result();
         }
 
         @Override
@@ -281,3 +278,4 @@ public class DirectorySQSQueue {
         }
     }
 }
+

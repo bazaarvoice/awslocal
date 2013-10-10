@@ -12,7 +12,6 @@ import com.amazonaws.services.sqs.model.CreateQueueResult;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 import com.bazaarvoice.awslocal.sqs.DirectorySQS;
-import com.google.common.base.Throwables;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -20,7 +19,6 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 
 @Test
 public class TestSNSClient {
@@ -33,7 +31,7 @@ public class TestSNSClient {
     public void prepareClient()
     {
         try {
-            _baseDir = createTempDirectory();
+            _baseDir = TestUtils.createTempDirectory();
             _amazonSQS1 = new DirectorySQS(_baseDir);
             _amazonSQS2 = new DirectorySQS(_baseDir);
         } catch (IOException e) {
@@ -126,9 +124,6 @@ public class TestSNSClient {
         ReceiveMessageResult result = _amazonSQS1.receiveMessage(new ReceiveMessageRequest(queueUrl));
         Assert.assertEquals(result.getMessages().size(), 1);
         Assert.assertEquals(result.getMessages().get(0).getBody(), message);
-
-
-
     }
 
     private String makeQueueArn(String queueName) {
@@ -151,22 +146,5 @@ public class TestSNSClient {
     private String someQueueName() {
         return RandomStringUtils.randomAlphanumeric(32);
     }
-
-    private String someMessageBody() {
-        return RandomStringUtils.random(1024);
-    }
-
-    private DirectorySQS createSQSClient() throws IOException {
-        return new DirectorySQS(createTempDirectory());
-    }
-
-    public static File createTempDirectory() {
-        try {
-            final File directory = Files.createTempDirectory("sqs").toFile();
-            directory.deleteOnExit(); // not sure if this works
-            return directory;
-        } catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
-    }
 }
+
