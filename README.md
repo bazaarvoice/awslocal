@@ -9,6 +9,26 @@ Currently, this implements:
 - SQS queues, by representing queues as directories and messages as files.
 - SNS, but only with the SQS protocol (it represents the topics in memory, and it takes an AmazonSQS implementation to send to SQS protocol subscriptions).
 
+Using it
+--------
+This library is built in Java 7.
+- SQS: 
+
+  ```java
+  AmazonSQS sqsClient = new DirectorySQS("<base directory for queues>")
+  ```
+
+  Then just use sqsClient just as the SDK specifies - create queues and send messages!
+  
+- SNS:
+
+  ```java
+  AmazonSNS snsClient = new InMemorySNS(<something implementing AmazonSQS>)
+  ```
+
+  Again, use it as if it were SNS; subscribe queues to topics, and broadcast to those topics! Note that topics only exist for a specific InMemorySNS.
+
+See the tests for further examples of use.
 
 Further development
 --------------------
