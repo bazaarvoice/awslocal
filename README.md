@@ -28,6 +28,17 @@ This library is built in Java 7.
 
   Again, use it as if it were SNS; subscribe queues to topics, and broadcast to those topics! Note that topics only exist for a specific InMemorySNS.
 
+  ```java
+      AmazonSQS sqs = new DirectorySQS(directory);
+      AmazonSNS sns = new InMemorySNS(sqs);
+
+      String topicName = "topicName";
+      String queueName = "queueName";
+      CreateTopicResult topicResult = sns.createTopic(new CreateTopicRequest(topicName));
+      CreateQueueResult queueResult = sqs.createQueue(new CreateQueueRequest(queueName));
+      GetQueueAttributesResult queueAttributesResult = sqs.getQueueAttributes(new GetQueueAttributesRequest(queueResult.getQueueUrl()).withAttributeNames("QueueArn"));
+      sns.subscribe(new SubscribeRequest(topicResult.getTopicArn(), "sqs", queueAttributesResult.getAttributes().get("QueueArn")));
+  ```
 See the tests for further examples of use.
 
 Further development
