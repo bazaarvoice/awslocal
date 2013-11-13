@@ -228,6 +228,7 @@ public class DirectorySQSQueue {
             return ComparisonChain.start()
                     .compare(this._visibilityTimeMillis, that._visibilityTimeMillis)
                     .compare(this._messageId, that._messageId)
+                    .compare(this._number, that._number)
                     .result();
         }
 

@@ -9,6 +9,9 @@ import com.amazonaws.services.sns.model.Subscription;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.CreateQueueResult;
+import com.amazonaws.services.sqs.model.GetQueueAttributesRequest;
+import com.amazonaws.services.sqs.model.GetQueueUrlRequest;
+import com.amazonaws.services.sqs.model.GetQueueUrlResult;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 import com.bazaarvoice.awslocal.sqs.DirectorySQS;
@@ -23,6 +26,7 @@ import java.io.IOException;
 @Test
 public class TestSNSClient {
 
+    public static final String ATTR_QUEUE_ARN = "QueueArn";
     private AmazonSQS _amazonSQS1;
     private AmazonSQS _amazonSQS2;
     private File _baseDir;
@@ -50,7 +54,7 @@ public class TestSNSClient {
                         withTopicArn(makeTopicArn(topicName)).
                         withProtocol("sqs").
                         withSubscriptionArn(makeSomeSubArn(topicName)).
-                        withEndpoint(makeQueueArn(queueName)));
+                        withEndpoint(getQueueArn(queueName)));
 
         Assert.assertEquals(amazonSNS.listTopics().getTopics().size(), 1);
         Assert.assertEquals(amazonSNS.listSubscriptions().getSubscriptions().size(), 1);
@@ -78,7 +82,7 @@ public class TestSNSClient {
                         withTopicArn(makeTopicArn(topicName)).
                         withProtocol("sqs").
                         withSubscriptionArn(makeSomeSubArn(topicName)).
-                        withEndpoint(makeQueueArn(queueName)));
+                        withEndpoint(getQueueArn(queueName)));
 
         amazonSNS.publish(new PublishRequest(makeTopicArn(topicName), message));
 
@@ -107,7 +111,7 @@ public class TestSNSClient {
 
         //subscribe.
         amazonSNS.subscribe(new SubscribeRequest().
-                withEndpoint(makeQueueArn(queueName)).
+                withEndpoint(getQueueArn(queueName)).
                 withProtocol("sqs").
                 withTopicArn(makeTopicArn(topicName)));
 
@@ -126,8 +130,10 @@ public class TestSNSClient {
         Assert.assertEquals(result.getMessages().get(0).getBody(), message);
     }
 
-    private String makeQueueArn(String queueName) {
-        return "arn:aws:sqs:local:user:" + queueName;
+    private String getQueueArn(String queueName) {
+        final String queueUrl = _amazonSQS1.getQueueUrl(new GetQueueUrlRequest(queueName)).getQueueUrl();
+        final GetQueueAttributesRequest getQueueAttributesRequest = new GetQueueAttributesRequest().withQueueUrl(queueUrl).withAttributeNames(ATTR_QUEUE_ARN);
+        return _amazonSQS1.getQueueAttributes(getQueueAttributesRequest).getAttributes().get(ATTR_QUEUE_ARN);
     }
 
     private String makeTopicArn(String name) {
