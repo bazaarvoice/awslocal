@@ -1,6 +1,5 @@
 package com.bazaarvoice.awslocal.sqs;
 
-
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.ChangeMessageVisibilityRequest;
@@ -8,6 +7,8 @@ import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.CreateQueueResult;
 import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.DeleteQueueRequest;
+import com.amazonaws.services.sqs.model.GetQueueAttributesRequest;
+import com.amazonaws.services.sqs.model.GetQueueAttributesResult;
 import com.amazonaws.services.sqs.model.GetQueueUrlRequest;
 import com.amazonaws.services.sqs.model.GetQueueUrlResult;
 import com.amazonaws.services.sqs.model.Message;
@@ -17,6 +18,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -25,6 +27,8 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 @Test
 public class TestSQSClient {
@@ -201,6 +205,22 @@ public class TestSQSClient {
         sleep(1);
 
         verifyReceiveNone(queueUrl);
+    }
+
+    public void getQueueArnFromAttributes() {
+        String queueName = someQueueName();
+        CreateQueueResult createQueueResult = _amazonSQS.createQueue(new CreateQueueRequest(queueName));
+        String queueUrl = createQueueResult.getQueueUrl();
+
+        List<String> requestedAttributes = ImmutableList.of("QueueArn");
+        GetQueueAttributesResult getQueueAttributesResult = _amazonSQS.getQueueAttributes(new GetQueueAttributesRequest()
+                .withQueueUrl(queueUrl)
+                .withAttributeNames(requestedAttributes));
+        Map<String, String> resultAttributes = getQueueAttributesResult.getAttributes();
+        String queueArn = resultAttributes.get("QueueArn");
+        String queueNameFromArn = queueArn.substring(queueArn.lastIndexOf(":") + 1);
+
+        Assert.assertEquals(queueNameFromArn, queueName);
     }
 
     private void sleep(int seconds)

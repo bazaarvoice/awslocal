@@ -29,6 +29,7 @@ public class DirectorySQS implements AmazonSQS {
     private static final Logger LOGGER = LoggerFactory.getLogger(DirectorySQS.class);
 
     private static final int AMAZON_DEFAULT_VISIBILITY = 30; // seconds
+    private static final String BASE_ARN = "arn:aws:sqs:local:user:";
 
     private final File _rootDirectory;
     private final int _defaultVisibilitySeconds;
@@ -338,9 +339,40 @@ public class DirectorySQS implements AmazonSQS {
         throw new UnsupportedOperationException("not implemented");
     }
 
-    //no
+    @Override
     public GetQueueAttributesResult getQueueAttributes(GetQueueAttributesRequest getQueueAttributesRequest) throws AmazonServiceException, AmazonClientException {
-        throw new UnsupportedOperationException("not implemented");
+        DirectorySQSQueue queue = getQueueFromUrl(getQueueAttributesRequest.getQueueUrl(), false);
+        Map<String, String> attributes = Maps.newHashMap();
+        List<String> unsupported = Lists.newArrayList();
+
+        for (String attribute : getQueueAttributesRequest.getAttributeNames()) {
+            switch (attribute) {
+                case "QueueArn":
+                    attributes.put("QueueArn", BASE_ARN + queue.getQueuePath().getFileName());
+                    break;
+                case "All":
+                case "ApproximateNumberOfMessages":
+                case "ApproximateNumberOfMessagesNotVisible":
+                case "VisibilityTimeout":
+                case "CreatedTimestamp":
+                case "LastModifiedTimestamp":
+                case "Policy":
+                case "MaximumMessageSize":
+                case "MessageRetentionPeriod":
+                case "ApproximateNumberOfMessagesDelayed":
+                case "DelaySeconds":
+                case "ReceiveMessageWaitTimeSeconds":
+                default:
+                    unsupported.add(attribute);
+                    break;
+            }
+        }
+
+        if (!unsupported.isEmpty()) {
+            throw new UnsupportedOperationException("attributes not implemented: " + unsupported);
+        }
+
+        return new GetQueueAttributesResult().withAttributes(attributes);
     }
 
     //nothing

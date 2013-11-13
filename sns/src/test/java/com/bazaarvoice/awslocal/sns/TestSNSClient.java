@@ -50,7 +50,7 @@ public class TestSNSClient {
                         withTopicArn(makeTopicArn(topicName)).
                         withProtocol("sqs").
                         withSubscriptionArn(makeSomeSubArn(topicName)).
-                        withEndpoint(makeTopicArn(queueName)));
+                        withEndpoint(makeQueueArn(queueName)));
 
         Assert.assertEquals(amazonSNS.listTopics().getTopics().size(), 1);
         Assert.assertEquals(amazonSNS.listSubscriptions().getSubscriptions().size(), 1);
@@ -78,7 +78,7 @@ public class TestSNSClient {
                         withTopicArn(makeTopicArn(topicName)).
                         withProtocol("sqs").
                         withSubscriptionArn(makeSomeSubArn(topicName)).
-                        withEndpoint(makeTopicArn(queueName)));
+                        withEndpoint(makeQueueArn(queueName)));
 
         amazonSNS.publish(new PublishRequest(makeTopicArn(topicName), message));
 
