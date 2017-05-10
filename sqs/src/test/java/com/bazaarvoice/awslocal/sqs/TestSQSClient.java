@@ -12,6 +12,7 @@ import com.amazonaws.services.sqs.model.GetQueueAttributesResult;
 import com.amazonaws.services.sqs.model.GetQueueUrlRequest;
 import com.amazonaws.services.sqs.model.GetQueueUrlResult;
 import com.amazonaws.services.sqs.model.Message;
+import com.amazonaws.services.sqs.model.PurgeQueueRequest;
 import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
 import com.amazonaws.services.sqs.model.QueueNameExistsException;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
@@ -201,6 +202,21 @@ public class TestSQSClient {
 
         final String receiptHandle = verifyReceiveEmail(sendResult.getMessageId(), queueUrl, 1);
         _amazonSQS.deleteMessage(new DeleteMessageRequest(queueUrl, receiptHandle));
+
+        sleep(1);
+
+        verifyReceiveNone(queueUrl);
+    }
+
+    public void willNotReceiveAfterPurged()
+            throws InterruptedException {
+        final String queueUrl = someNewQueue();
+
+        for (int i = 0; i < 3; i++) {
+            _amazonSQS.sendMessage(new SendMessageRequest(queueUrl, someMessageBody()));
+        }
+
+        _amazonSQS.purgeQueue(new PurgeQueueRequest(queueUrl));
 
         sleep(1);
 
