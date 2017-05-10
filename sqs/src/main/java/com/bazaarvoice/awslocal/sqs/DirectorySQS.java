@@ -2,21 +2,64 @@ package com.bazaarvoice.awslocal.sqs;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
-import com.amazonaws.AmazonWebServiceRequest;
-import com.amazonaws.ResponseMetadata;
-import com.amazonaws.regions.Region;
-import com.amazonaws.services.sqs.AmazonSQS;
-import com.amazonaws.services.sqs.model.*;
+import com.amazonaws.services.sqs.AbstractAmazonSQS;
+import com.amazonaws.services.sqs.model.BatchResultErrorEntry;
+import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequest;
+import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
+import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchResult;
+import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchResultEntry;
+import com.amazonaws.services.sqs.model.ChangeMessageVisibilityRequest;
+import com.amazonaws.services.sqs.model.ChangeMessageVisibilityResult;
+import com.amazonaws.services.sqs.model.CreateQueueRequest;
+import com.amazonaws.services.sqs.model.CreateQueueResult;
+import com.amazonaws.services.sqs.model.DeleteMessageBatchRequest;
+import com.amazonaws.services.sqs.model.DeleteMessageBatchRequestEntry;
+import com.amazonaws.services.sqs.model.DeleteMessageBatchResult;
+import com.amazonaws.services.sqs.model.DeleteMessageBatchResultEntry;
+import com.amazonaws.services.sqs.model.DeleteMessageRequest;
+import com.amazonaws.services.sqs.model.DeleteMessageResult;
+import com.amazonaws.services.sqs.model.DeleteQueueRequest;
+import com.amazonaws.services.sqs.model.DeleteQueueResult;
+import com.amazonaws.services.sqs.model.GetQueueAttributesRequest;
+import com.amazonaws.services.sqs.model.GetQueueAttributesResult;
+import com.amazonaws.services.sqs.model.GetQueueUrlRequest;
+import com.amazonaws.services.sqs.model.GetQueueUrlResult;
+import com.amazonaws.services.sqs.model.ListQueuesRequest;
+import com.amazonaws.services.sqs.model.ListQueuesResult;
+import com.amazonaws.services.sqs.model.Message;
+import com.amazonaws.services.sqs.model.PurgeQueueRequest;
+import com.amazonaws.services.sqs.model.PurgeQueueResult;
+import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
+import com.amazonaws.services.sqs.model.QueueNameExistsException;
+import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
+import com.amazonaws.services.sqs.model.ReceiveMessageResult;
+import com.amazonaws.services.sqs.model.SendMessageBatchRequest;
+import com.amazonaws.services.sqs.model.SendMessageBatchRequestEntry;
+import com.amazonaws.services.sqs.model.SendMessageBatchResult;
+import com.amazonaws.services.sqs.model.SendMessageBatchResultEntry;
+import com.amazonaws.services.sqs.model.SendMessageRequest;
+import com.amazonaws.services.sqs.model.SendMessageResult;
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.*;
+import java.nio.file.ClosedWatchServiceException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +67,7 @@ import java.util.Map;
 /**
  * This class is a basic implementation of AmazonSQS, intended as a substitute for local development/testing.
  */
-public class DirectorySQS implements AmazonSQS {
+public class DirectorySQS extends AbstractAmazonSQS {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DirectorySQS.class);
 
@@ -134,7 +177,7 @@ public class DirectorySQS implements AmazonSQS {
     }
 
     @Override
-    public CreateQueueResult createQueue(CreateQueueRequest createQueueRequest) throws AmazonServiceException, AmazonClientException {
+    public CreateQueueResult createQueue(CreateQueueRequest createQueueRequest) throws AmazonClientException {
         try {
             File topicFile = new File(_rootDirectory, createQueueRequest.getQueueName());
             if (topicFile.exists()) {
@@ -148,7 +191,8 @@ public class DirectorySQS implements AmazonSQS {
     }
 
     //opens a SQS queue (for the specified file), puts it into the map, and returns the path (as the url result)
-    public GetQueueUrlResult getQueueUrl(GetQueueUrlRequest getQueueUrlRequest) throws AmazonServiceException, AmazonClientException {
+    @Override
+    public GetQueueUrlResult getQueueUrl(GetQueueUrlRequest getQueueUrlRequest) throws AmazonClientException {
         try {
             File topicFile = new File(_rootDirectory, getQueueUrlRequest.getQueueName());
             if (!topicFile.exists()) {
@@ -160,7 +204,8 @@ public class DirectorySQS implements AmazonSQS {
         }
     }
 
-    public SendMessageResult sendMessage(SendMessageRequest sendMessageRequest) throws AmazonServiceException, AmazonClientException {
+    @Override
+    public SendMessageResult sendMessage(SendMessageRequest sendMessageRequest) throws AmazonClientException {
         DirectorySQSQueue queue = getQueueFromUrl(sendMessageRequest.getQueueUrl(), false);
         final int invisibilityDelay = Objects.firstNonNull(sendMessageRequest.getDelaySeconds(), 0);//0 is amazon spec default
 
@@ -172,7 +217,8 @@ public class DirectorySQS implements AmazonSQS {
         }
     }
 
-    public ReceiveMessageResult receiveMessage(ReceiveMessageRequest receiveMessageRequest) throws AmazonServiceException, AmazonClientException {
+    @Override
+    public ReceiveMessageResult receiveMessage(ReceiveMessageRequest receiveMessageRequest) throws AmazonClientException {
         DirectorySQSQueue queue = getQueueFromUrl(receiveMessageRequest.getQueueUrl(), false);
 
         //make sure we have a default for max number of messages.
@@ -192,16 +238,19 @@ public class DirectorySQS implements AmazonSQS {
         }
     }
 
-    public void deleteMessage(DeleteMessageRequest deleteMessageRequest) throws AmazonServiceException, AmazonClientException {
+    @Override
+    public DeleteMessageResult deleteMessage(DeleteMessageRequest deleteMessageRequest) throws AmazonClientException {
         try {
             DirectorySQSQueue queue = getQueueFromUrl(deleteMessageRequest.getQueueUrl(), false);
             queue.delete(deleteMessageRequest.getReceiptHandle());
+            return new DeleteMessageResult();
         } catch (IOException e) {
             throw new AmazonServiceException("error deleting message", e);
         }
     }
 
-    public DeleteMessageBatchResult deleteMessageBatch(DeleteMessageBatchRequest deleteMessageBatchRequest) throws AmazonServiceException, AmazonClientException {
+    @Override
+    public DeleteMessageBatchResult deleteMessageBatch(DeleteMessageBatchRequest deleteMessageBatchRequest) throws AmazonClientException {
         DirectorySQSQueue queue = getQueueFromUrl(deleteMessageBatchRequest.getQueueUrl(), false);
         //lists for reporting
         List<BatchResultErrorEntry> batchResultErrorEntries = new ArrayList<>();
@@ -222,16 +271,19 @@ public class DirectorySQS implements AmazonSQS {
         return new DeleteMessageBatchResult().withFailed(batchResultErrorEntries).withSuccessful(batchResultEntries);
     }
 
-    public void changeMessageVisibility(ChangeMessageVisibilityRequest changeMessageVisibilityRequest) throws AmazonServiceException, AmazonClientException {
+    @Override
+    public ChangeMessageVisibilityResult changeMessageVisibility(ChangeMessageVisibilityRequest changeMessageVisibilityRequest) throws AmazonClientException {
         try {
             DirectorySQSQueue queue = getQueueFromUrl(changeMessageVisibilityRequest.getQueueUrl(), false);
             queue.changeVisibility(changeMessageVisibilityRequest.getReceiptHandle(), changeMessageVisibilityRequest.getVisibilityTimeout());
+            return new ChangeMessageVisibilityResult();
         } catch (IOException e) {
             throw new AmazonServiceException("error", e);
         }
     }
 
-    public ChangeMessageVisibilityBatchResult changeMessageVisibilityBatch(ChangeMessageVisibilityBatchRequest changeMessageVisibilityBatchRequest) throws AmazonServiceException, AmazonClientException {
+    @Override
+    public ChangeMessageVisibilityBatchResult changeMessageVisibilityBatch(ChangeMessageVisibilityBatchRequest changeMessageVisibilityBatchRequest) throws AmazonClientException {
         DirectorySQSQueue queue = getQueueFromUrl(changeMessageVisibilityBatchRequest.getQueueUrl(), false);
         //lists for reporting
         List<BatchResultErrorEntry> batchResultErrorEntries = new ArrayList<>();
@@ -252,20 +304,19 @@ public class DirectorySQS implements AmazonSQS {
         return new ChangeMessageVisibilityBatchResult().withFailed(batchResultErrorEntries).withSuccessful(batchResultEntries);
     }
 
-    public void deleteQueue(DeleteQueueRequest deleteQueueRequest) throws AmazonServiceException, AmazonClientException {
+    @Override
+    public DeleteQueueResult deleteQueue(DeleteQueueRequest deleteQueueRequest) throws AmazonClientException {
         final DirectorySQSQueue queue = getQueueFromUrl(deleteQueueRequest.getQueueUrl(), true);
         try {
             Files.delete(queue.getQueuePath());
+            return new DeleteQueueResult();
         } catch (IOException e) {
             throw new AmazonServiceException("Could not delete queue: " + queue.getQueuePath());
         }
     }
 
-    public ListQueuesResult listQueues() throws AmazonServiceException, AmazonClientException {
-        return listQueues(new ListQueuesRequest());
-    }
-
-    public ListQueuesResult listQueues(ListQueuesRequest listQueuesRequest) throws AmazonServiceException, AmazonClientException {
+    @Override
+    public ListQueuesResult listQueues(ListQueuesRequest listQueuesRequest) throws AmazonClientException {
         List<String> queueUrls = Lists.newArrayListWithCapacity(_queuesByUrl.size());
         try (DirectoryStream<Path> queuePaths = Files.newDirectoryStream(_rootDirectory.toPath())) {
             for (Path queuePath : queuePaths) {
@@ -279,7 +330,8 @@ public class DirectorySQS implements AmazonSQS {
         return new ListQueuesResult().withQueueUrls(queueUrls);
     }
 
-    public SendMessageBatchResult sendMessageBatch(SendMessageBatchRequest sendMessageBatchRequest) throws AmazonServiceException, AmazonClientException {
+    @Override
+    public SendMessageBatchResult sendMessageBatch(SendMessageBatchRequest sendMessageBatchRequest) throws AmazonClientException {
         DirectorySQSQueue queue = getQueueFromUrl(sendMessageBatchRequest.getQueueUrl(), false);
         //lists for reporting
         List<BatchResultErrorEntry> batchResultErrorEntries = new ArrayList<>();
@@ -306,16 +358,6 @@ public class DirectorySQS implements AmazonSQS {
                 withSuccessful(batchResultEntries);
     }
 
-    //no
-    public void addPermission(AddPermissionRequest addPermissionRequest) throws AmazonServiceException, AmazonClientException {
-        throw new UnsupportedOperationException("not implemented");
-    }
-
-    //no
-    public void removePermission(RemovePermissionRequest removePermissionRequest) throws AmazonServiceException, AmazonClientException {
-        throw new UnsupportedOperationException("not implemented");
-    }
-
     public void shutdown() {
         try {
             _queuesWatcher.close();
@@ -324,23 +366,8 @@ public class DirectorySQS implements AmazonSQS {
         }
     }
 
-    //no
-    public ResponseMetadata getCachedResponseMetadata(AmazonWebServiceRequest amazonWebServiceRequest) {
-        throw new UnsupportedOperationException("not implemented");
-    }
-
-    //no
-    public void setEndpoint(String s) throws IllegalArgumentException {
-        throw new UnsupportedOperationException("not implemented");
-    }
-
-    //no
-    public void setQueueAttributes(SetQueueAttributesRequest setQueueAttributesRequest) throws AmazonServiceException, AmazonClientException {
-        throw new UnsupportedOperationException("not implemented");
-    }
-
     @Override
-    public GetQueueAttributesResult getQueueAttributes(GetQueueAttributesRequest getQueueAttributesRequest) throws AmazonServiceException, AmazonClientException {
+    public GetQueueAttributesResult getQueueAttributes(GetQueueAttributesRequest getQueueAttributesRequest) throws AmazonClientException {
         DirectorySQSQueue queue = getQueueFromUrl(getQueueAttributesRequest.getQueueUrl(), false);
         Map<String, String> attributes = Maps.newHashMap();
         List<String> unsupported = Lists.newArrayList();
@@ -375,10 +402,15 @@ public class DirectorySQS implements AmazonSQS {
         return new GetQueueAttributesResult().withAttributes(attributes);
     }
 
-    //nothing
     @Override
-    public void setRegion(Region region) throws IllegalArgumentException {
-        throw new UnsupportedOperationException("not implemented");
+    public PurgeQueueResult purgeQueue(PurgeQueueRequest purgeQueueRequest) {
+        DirectorySQSQueue queue = getQueueFromUrl(purgeQueueRequest.getQueueUrl(), false);
+        try {
+            queue.purge();
+            return new PurgeQueueResult();
+        } catch (IOException e) {
+            throw new AmazonServiceException("Could not purge queue: " + queue.getQueuePath());
+        }
     }
 }
 

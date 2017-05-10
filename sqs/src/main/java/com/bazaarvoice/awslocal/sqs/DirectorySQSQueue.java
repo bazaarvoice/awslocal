@@ -6,7 +6,6 @@ import com.amazonaws.util.BinaryUtils;
 import com.amazonaws.util.Md5Utils;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.Lists;
-import com.google.common.primitives.Ints;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -22,7 +21,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -86,11 +84,7 @@ public class DirectorySQSQueue {
     }
 
     private String getMD5(byte[] bytes) {
-        try {
-            return BinaryUtils.toHex(Md5Utils.computeMD5Hash(bytes));
-        } catch (NoSuchAlgorithmException | IOException e) {
-            throw new IllegalStateException(e);
-        }
+        return BinaryUtils.toHex(Md5Utils.computeMD5Hash(bytes));
     }
 
     private boolean tryAtomicRename(Path source, MessageAccessor accessor)
@@ -176,6 +170,13 @@ public class DirectorySQSQueue {
     public void delete(String receiptHandle) throws IOException {
         final Path path = toValidPath(receiptHandle);
         Files.deleteIfExists(path);
+    }
+
+    public void purge() throws IOException {
+        MessageAccessor accessor;
+        while ((accessor = _messageQueue.poll()) != null) {
+            Files.deleteIfExists(accessor.getPath());
+        }
     }
 
     private Path toValidPath(String receiptHandle) {
