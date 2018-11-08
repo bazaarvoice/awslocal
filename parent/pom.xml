@@ -11,7 +11,7 @@
 
     <groupId>com.bazaarvoice.awslocal</groupId>
     <artifactId>parent</artifactId>
-    <version>1.4-SNAPSHOT</version>
+    <version>1.4</version>
     <packaging>pom</packaging>
 
     <properties>
@@ -64,4 +64,8 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+  <scm>
+    <tag>awslocal-1.4</tag>
+  </scm>
 </project>
