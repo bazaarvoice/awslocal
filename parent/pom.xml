@@ -16,7 +16,7 @@
 
     <properties>
         <java.minimum.version>1.8</java.minimum.version>
-        <aws.version>1.11.407</aws.version>
+        <aws.version>1.11.537</aws.version>
     </properties>
 
     <dependencyManagement>
