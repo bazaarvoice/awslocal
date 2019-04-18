@@ -39,9 +39,6 @@ import com.amazonaws.services.sqs.model.SendMessageBatchResult;
 import com.amazonaws.services.sqs.model.SendMessageBatchResultEntry;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
-import com.google.common.base.Objects;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,8 +58,10 @@ import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * This class is a basic implementation of AmazonSQS, intended as a substitute for local development/testing.
@@ -77,7 +76,7 @@ public class DirectorySQS extends AbstractAmazonSQS {
     private final File _rootDirectory;
     private final int _defaultVisibilitySeconds;
 
-    private final Map<String, DirectorySQSQueue> _queuesByUrl = Maps.newHashMap();
+    private final Map<String, DirectorySQSQueue> _queuesByUrl = new HashMap<>();
     private final WatchService _queuesWatcher;
 
     public DirectorySQS(File rootDirectory)
@@ -93,32 +92,27 @@ public class DirectorySQS extends AbstractAmazonSQS {
         startWatcher();
     }
 
-    private void startWatcher() throws IOException {
-        final Thread thread = new Thread() {
-            @Override
-            public void run() {
-                while (true) {
-                    try {
-                        final WatchKey key = _queuesWatcher.take();
-                        for (WatchEvent<?> event : key.pollEvents()) {
-                            handleWatcherEvent(event, (Path) key.watchable());
-                        }
-                        key.reset();
-                    } catch (IOException e) {
-                        LOGGER.warn("Error watching: " + _rootDirectory, e);
-                    } catch (ClosedWatchServiceException | InterruptedException e) {
-                        LOGGER.debug("Watcher thread exiting: " + _rootDirectory);
-                        break;
+    private void startWatcher() {
+        final Thread thread = new Thread(() -> {
+            while (true) {
+                try {
+                    final WatchKey key = _queuesWatcher.take();
+                    for (WatchEvent<?> event : key.pollEvents()) {
+                        handleWatcherEvent(event, (Path) key.watchable());
                     }
+                    key.reset();
+                } catch (ClosedWatchServiceException | InterruptedException e) {
+                    LOGGER.debug("Watcher thread exiting: " + _rootDirectory);
+                    break;
                 }
             }
-        };
+        });
         thread.setName("DirectorySQS-Watcher-Thread");
         thread.setDaemon(true);
         thread.start();
     }
 
-    private void handleWatcherEvent(WatchEvent<?> event, Path parent) throws IOException {
+    private void handleWatcherEvent(WatchEvent<?> event, Path parent) {
         final Path newPath = (Path)event.context();
         DirectorySQSQueue queueOfEvent = _queuesByUrl.get(parent.toUri().toString());
         if (queueOfEvent == null) {
@@ -207,7 +201,7 @@ public class DirectorySQS extends AbstractAmazonSQS {
     @Override
     public SendMessageResult sendMessage(SendMessageRequest sendMessageRequest) throws AmazonClientException {
         DirectorySQSQueue queue = getQueueFromUrl(sendMessageRequest.getQueueUrl(), false);
-        final int invisibilityDelay = Objects.firstNonNull(sendMessageRequest.getDelaySeconds(), 0);//0 is amazon spec default
+        final int invisibilityDelay = Optional.ofNullable(sendMessageRequest.getDelaySeconds()).orElse(0);//0 is amazon spec default
 
         try {
             final Message message = queue.send(sendMessageRequest.getMessageBody(), invisibilityDelay);
@@ -222,11 +216,11 @@ public class DirectorySQS extends AbstractAmazonSQS {
         DirectorySQSQueue queue = getQueueFromUrl(receiveMessageRequest.getQueueUrl(), false);
 
         //make sure we have a default for max number of messages.
-        int maxNumberOfMessages = Objects.firstNonNull(receiveMessageRequest.getMaxNumberOfMessages(), 10); //10 is amazon spec default
+        int maxNumberOfMessages = Optional.ofNullable(receiveMessageRequest.getMaxNumberOfMessages()).orElse(10); //10 is amazon spec default
         //and a default visibility timeout
-        int visibilityTimeout = Objects.firstNonNull(receiveMessageRequest.getVisibilityTimeout(), _defaultVisibilitySeconds);
+        int visibilityTimeout = Optional.ofNullable(receiveMessageRequest.getVisibilityTimeout()).orElse(_defaultVisibilitySeconds);
         //also a wait time
-        int waitTime = Objects.firstNonNull(receiveMessageRequest.getWaitTimeSeconds(), 0);
+        int waitTime = Optional.ofNullable(receiveMessageRequest.getWaitTimeSeconds()).orElse(0);
         if (waitTime < 0 || waitTime > 20) {
             throw new AmazonServiceException("wait time of " + waitTime + " is not between 0 and 20");
         }
@@ -317,7 +311,7 @@ public class DirectorySQS extends AbstractAmazonSQS {
 
     @Override
     public ListQueuesResult listQueues(ListQueuesRequest listQueuesRequest) throws AmazonClientException {
-        List<String> queueUrls = Lists.newArrayListWithCapacity(_queuesByUrl.size());
+        List<String> queueUrls = new ArrayList<>(_queuesByUrl.size());
         try (DirectoryStream<Path> queuePaths = Files.newDirectoryStream(_rootDirectory.toPath())) {
             for (Path queuePath : queuePaths) {
                 if (listQueuesRequest.getQueueNamePrefix() == null || queuePath.getFileName().toString().startsWith(listQueuesRequest.getQueueNamePrefix())) {
@@ -339,7 +333,7 @@ public class DirectorySQS extends AbstractAmazonSQS {
         //attempt to change the visibility on each
         for (SendMessageBatchRequestEntry batchRequestEntry : sendMessageBatchRequest.getEntries()) {
             try {
-                final int invisibilityDelay = Objects.firstNonNull(batchRequestEntry.getDelaySeconds(), 0);//0 is amazon spec default
+                final int invisibilityDelay = Optional.ofNullable(batchRequestEntry.getDelaySeconds()).orElse(0);//0 is amazon spec default
                 Message sentMessage = queue.send(batchRequestEntry.getMessageBody(), invisibilityDelay);
                 batchResultEntries.add(new SendMessageBatchResultEntry().
                         withId(batchRequestEntry.getId()).
@@ -369,8 +363,8 @@ public class DirectorySQS extends AbstractAmazonSQS {
     @Override
     public GetQueueAttributesResult getQueueAttributes(GetQueueAttributesRequest getQueueAttributesRequest) throws AmazonClientException {
         DirectorySQSQueue queue = getQueueFromUrl(getQueueAttributesRequest.getQueueUrl(), false);
-        Map<String, String> attributes = Maps.newHashMap();
-        List<String> unsupported = Lists.newArrayList();
+        Map<String, String> attributes = new HashMap<>();
+        List<String> unsupported = new ArrayList<>();
 
         for (String attribute : getQueueAttributesRequest.getAttributeNames()) {
             switch (attribute) {
