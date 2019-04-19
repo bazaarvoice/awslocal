@@ -137,9 +137,7 @@ public class DirectorySQS extends AbstractAmazonSQS {
         final String queueUrl = queue.getQueuePath().toUri().toString();
         //don't panic, this is reentrant
         synchronized (_queuesByUrl) {
-            if (!_queuesByUrl.containsKey(queueUrl)) {
-                _queuesByUrl.put(queueUrl, queue);
-            }
+            _queuesByUrl.putIfAbsent(queueUrl, queue);
         }
         try {
             queue.getQueuePath().register(_queuesWatcher, StandardWatchEventKinds.ENTRY_CREATE);

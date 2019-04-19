@@ -25,7 +25,7 @@ import com.amazonaws.services.sns.model.UnsubscribeResult;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.GetQueueUrlRequest;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
-import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 public class InMemorySNS extends AbstractAmazonSNS {
@@ -42,6 +43,7 @@ public class InMemorySNS extends AbstractAmazonSNS {
 
     private Map<String, List<String>> _subscriptionsForTopic = new HashMap<>();
     private Map<String, Subscription> _subscriptionsByArn = new HashMap<>();
+    private Random _random = new Random();
 
     private AmazonSQS _sqsClient;
 
@@ -49,10 +51,8 @@ public class InMemorySNS extends AbstractAmazonSNS {
         _sqsClient = sqsClient;
         for (Subscription subscription : subscriptions) {
             _subscriptionsByArn.put(subscription.getSubscriptionArn(), subscription);
-            if (!_subscriptionsForTopic.containsKey(subscription.getTopicArn())) {
-                _subscriptionsForTopic.put(subscription.getTopicArn(), new ArrayList<String>());
-            }
-            _subscriptionsForTopic.get(subscription.getTopicArn()).add(subscription.getSubscriptionArn());
+            _subscriptionsForTopic.computeIfAbsent(subscription.getTopicArn(), key -> new ArrayList<>())
+                    .add(subscription.getSubscriptionArn());
         }
     }
 
@@ -62,24 +62,17 @@ public class InMemorySNS extends AbstractAmazonSNS {
         if (!_subscriptionsForTopic.containsKey(topicArn)) {
             throw new NotFoundException("no such topic " + topicArn);
         }
-        List<Subscription> topicSubscriptions = _subscriptionsForTopic.get(topicArn).stream()
-                .map(key -> {
-                    Subscription result = _subscriptionsByArn.get(key);
-                    if (result == null && !_subscriptionsByArn.containsKey(key)) {
-                        throw new IllegalArgumentException("Missing subscription for arn: " + key);
-                    }
-                    return result;
-                })
-                .collect(Collectors.toList());
-        for (Subscription subscription : topicSubscriptions) {
-            String queueName = getLast(subscription.getEndpoint().split(":"));
-            String queueUrl = _sqsClient.
-                    getQueueUrl(new GetQueueUrlRequest().withQueueName(queueName)).
-                    getQueueUrl();
-            _sqsClient.sendMessage(new SendMessageRequest().
-                    withQueueUrl(queueUrl).
-                    withMessageBody(publishRequest.getMessage()));
-        }
+        _subscriptionsForTopic.get(topicArn).stream()
+                .map(_subscriptionsByArn::get)
+                .forEach(subscription -> {
+                    String queueName = StringUtils.substringAfterLast(subscription.getEndpoint(), ":");
+                    String queueUrl = _sqsClient.
+                            getQueueUrl(new GetQueueUrlRequest().withQueueName(queueName)).
+                            getQueueUrl();
+                    _sqsClient.sendMessage(new SendMessageRequest().
+                            withQueueUrl(queueUrl).
+                            withMessageBody(publishRequest.getMessage()));
+                });
         return new PublishResult();
     }
 
@@ -93,17 +86,26 @@ public class InMemorySNS extends AbstractAmazonSNS {
         if (!_subscriptionsForTopic.containsKey(topicArn)) {
             throw new InvalidParameterException("no such topic " + topicArn);
         }
-        String subscriptionArn = topicArn + ":" + RandomStringUtils.randomNumeric(7);
-        if (!_subscriptionsByArn.containsKey(subscriptionArn)) {
-            _subscriptionsByArn.put(subscriptionArn, new Subscription().
-                    withTopicArn(topicArn).
-                    withProtocol(protocol).
-                    withSubscriptionArn(subscriptionArn).
-                    withEndpoint(subscribeRequest.getEndpoint()));
-            _subscriptionsForTopic.get(topicArn).add(subscriptionArn);
+        String subscriptionArn = topicArn + ":" + nextSubscriptionSuffix();
+        while (_subscriptionsByArn.containsKey(subscriptionArn)) {
+            // Avoid ID collision by generating a new suffix
+            subscriptionArn = topicArn + ":" + nextSubscriptionSuffix();
         }
+        _subscriptionsByArn.put(subscriptionArn, new Subscription().
+                withTopicArn(topicArn).
+                withProtocol(protocol).
+                withSubscriptionArn(subscriptionArn).
+                withEndpoint(subscribeRequest.getEndpoint()));
+        _subscriptionsForTopic.get(topicArn).add(subscriptionArn);
 
         return new SubscribeResult().withSubscriptionArn(subscriptionArn);
+    }
+
+    /**
+     * @return some 7-digit numeral
+     */
+    private int nextSubscriptionSuffix() {
+        return 1000000 + _random.nextInt(9000000);
     }
 
     @Override
@@ -120,9 +122,7 @@ public class InMemorySNS extends AbstractAmazonSNS {
     public CreateTopicResult createTopic(CreateTopicRequest createTopicRequest) throws AmazonClientException {
         String topicArn = BASE_ARN + createTopicRequest.getName();
         CreateTopicResult result = new CreateTopicResult().withTopicArn(topicArn);
-        if (!_subscriptionsForTopic.containsKey(topicArn)) {
-            _subscriptionsForTopic.put(topicArn, new ArrayList<String>());
-        }
+        _subscriptionsForTopic.putIfAbsent(topicArn, new ArrayList<>());
         return result;
     }
 
@@ -140,13 +140,7 @@ public class InMemorySNS extends AbstractAmazonSNS {
         return new ListSubscriptionsByTopicResult().
                 withSubscriptions(_subscriptionsForTopic.get(listSubscriptionsByTopicRequest.getTopicArn()).stream()
                         .filter(_subscriptionsByArn.keySet()::contains)
-                        .map(key -> {
-                            Subscription result = _subscriptionsByArn.get(key);
-                            if (result == null && !_subscriptionsByArn.containsKey(key)) {
-                                throw new IllegalArgumentException("Missing subscription for arn: " + key);
-                            }
-                            return result;
-                        })
+                        .map(_subscriptionsByArn::get)
                         .collect(Collectors.toList()));
     }
 
@@ -171,10 +165,6 @@ public class InMemorySNS extends AbstractAmazonSNS {
     @Override
     public ListTopicsResult listTopics(ListTopicsRequest listTopicsRequest) throws AmazonClientException {
         return listTopics();
-    }
-
-    private static <T> T getLast(T[] array) {
-        return array.length > 0 ? array[array.length - 1] : null;
     }
 
 }

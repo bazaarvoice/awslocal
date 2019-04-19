@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.ToLongFunction;
 
 /**
  * This class manages a single queue that is persisted in a particular directory.
