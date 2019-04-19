@@ -8,9 +8,6 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
-import com.google.common.base.Throwables;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -18,9 +15,10 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Test
 public class TestSQSClientCooperation {
@@ -113,7 +111,7 @@ public class TestSQSClientCooperation {
     public void fiveMessagesToClient2FiveToClient1() {
         final String queueUrl = someNewQueue();
 
-        final List<SendMessageResult> sendResults = Lists.newArrayListWithCapacity(10);
+        final List<SendMessageResult> sendResults = new ArrayList<>(10);
 
         for (int i = 0; i < 10; i++ ) {
             sendResults.add(_sqs1.sendMessage(new SendMessageRequest(queueUrl, someMessageBody())));
@@ -137,11 +135,14 @@ public class TestSQSClientCooperation {
                 withMaxNumberOfMessages(5));
 
         Assert.assertEquals(receiveMessageResult2.getMessages().size(), 5, "c2 did not get 5 messages");
-        for (Message message : Iterables.concat(receiveMessageResult1.getMessages(), receiveMessageResult2.getMessages())) {
+        Stream.concat(
+                receiveMessageResult1.getMessages().stream(),
+                receiveMessageResult2.getMessages().stream()
+        ).forEach(message -> {
             Assert.assertTrue(sentIds.contains(message.getMessageId()));
             sentIds.remove(message.getMessageId());
             Assert.assertTrue(sentBodiesMD5.contains(message.getMD5OfBody()));
-        }
+        });
     }
 
     public void client1GetsFromBoth() {

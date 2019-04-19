@@ -19,7 +19,6 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
-import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -228,7 +227,7 @@ public class TestSQSClient {
         CreateQueueResult createQueueResult = _amazonSQS.createQueue(new CreateQueueRequest(queueName));
         String queueUrl = createQueueResult.getQueueUrl();
 
-        List<String> requestedAttributes = ImmutableList.of("QueueArn");
+        List<String> requestedAttributes = Collections.singletonList("QueueArn");
         GetQueueAttributesResult getQueueAttributesResult = _amazonSQS.getQueueAttributes(new GetQueueAttributesRequest()
                 .withQueueUrl(queueUrl)
                 .withAttributeNames(requestedAttributes));

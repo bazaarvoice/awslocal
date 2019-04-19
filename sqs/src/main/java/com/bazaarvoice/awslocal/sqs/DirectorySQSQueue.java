@@ -4,8 +4,6 @@ import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiptHandleIsInvalidException;
 import com.amazonaws.util.BinaryUtils;
 import com.amazonaws.util.Md5Utils;
-import com.google.common.collect.ComparisonChain;
-import com.google.common.collect.Lists;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -21,6 +19,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -41,7 +41,13 @@ public class DirectorySQSQueue {
     private static final String SUFFIX = ".msg";
 
     private final Path _path;
-    private final PriorityBlockingQueue<MessageAccessor> _messageQueue = new PriorityBlockingQueue<>();
+    private final PriorityBlockingQueue<MessageAccessor> _messageQueue = new PriorityBlockingQueue<>(
+            /* PriorityBlockingQueue.DEFAULT_INITIAL_CAPACITY */ 11,
+            Comparator
+                    .<MessageAccessor>comparingLong(value -> value._visibilityTimeMillis)
+                    .thenComparing(value -> value._messageId)
+                    .thenComparingInt(value -> value._number)
+    );
     private final AtomicInteger _counter = new AtomicInteger(1);
 
     public DirectorySQSQueue(Path path)
@@ -98,7 +104,7 @@ public class DirectorySQSQueue {
     }
 
     public List<Message> receive(int maximumNumberOfMessages, int visibilityTimeout, int waitTime) throws IOException {
-        List<MessageAccessor> claimed = Lists.newArrayListWithCapacity(maximumNumberOfMessages);
+        List<MessageAccessor> claimed = new ArrayList<>(maximumNumberOfMessages);
 
         final long endTimeMillis = System.currentTimeMillis() + waitTime * 1000;
         boolean tryClaimAgain = false;
@@ -113,7 +119,7 @@ public class DirectorySQSQueue {
             tryClaimAgain = claimTo(claimed, visibilityTimeout, 0);
         }
 
-        List<Message> messages = Lists.newArrayListWithCapacity(claimed.size());
+        List<Message> messages = new ArrayList<>(claimed.size());
         for (MessageAccessor accessor : claimed) {
             _messageQueue.offer(accessor);
             messages.add(new Message().
@@ -203,7 +209,7 @@ public class DirectorySQSQueue {
         return new MessageAccessor(parts[0], Integer.parseInt(parts[1]), Long.parseLong(parts[2]));
     }
 
-    private class MessageAccessor implements Comparable<MessageAccessor> {
+    private class MessageAccessor {
         private final String _messageId;
         private final int _number;
         private final long _visibilityTimeMillis;
@@ -222,15 +228,6 @@ public class DirectorySQSQueue {
 
         public String getMessageId() {
             return _messageId;
-        }
-
-        @Override
-        public int compareTo(MessageAccessor that) {
-            return ComparisonChain.start()
-                    .compare(this._visibilityTimeMillis, that._visibilityTimeMillis)
-                    .compare(this._messageId, that._messageId)
-                    .compare(this._number, that._number)
-                    .result();
         }
 
         @Override
